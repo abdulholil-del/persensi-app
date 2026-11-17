@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1E40AF"><link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" media="print" onload="this.media='all'"><title>Presensi Satpam</title>
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<script>
+(function(){
+ function wipe(){var p=[];if(window.caches)p.push(caches.keys().then(function(k){return Promise.all(k.map(function(x){return caches.delete(x)}))}));
+  if(navigator.serviceWorker)p.push(navigator.serviceWorker.getRegistrations().then(function(r){return Promise.all(r.map(function(x){return x.unregister()}))}));
+  return Promise.all(p).then(function(){try{localStorage.clear();sessionStorage.clear()}catch(e){}})}
+ window.__wipe=function(){wipe().then(function(){location.replace(location.pathname)})};
+ if(location.search.indexOf('reset')>=0)window.__wipe();
+ function show(m){var sp=document.getElementById('splash');if(sp)sp.style.display='none';var a=document.getElementById('app');if(a&&!a.innerHTML.trim()){a.innerHTML='<div style="padding:20px;font-family:sans-serif"><b>Aplikasi gagal dimuat</b><p style="color:#64748B;word-break:break-word">'+String(m).replace(/</g,'&lt;')+'</p><button style="min-height:44px;padding:8px 16px;border:0;border-radius:12px;background:#1E40AF;color:#fff;font-weight:700" onclick="__wipe()">Bersihkan cache &amp; muat ulang</button></div>';}}
+ addEventListener('error',function(e){show(e.message||'Error')});
+ setTimeout(function(){var sp=document.getElementById('splash');if(sp)sp.style.display='none'},9000);
+ setTimeout(function(){show('Tidak ada tampilan setelah 4 detik. Kemungkinan berkas lama tertinggal di cache.')},4000);
+})();
+</script>
+<link rel="stylesheet" href="css/style.css?v=15"></head><body>
+<div id="pwa" hidden><span id="pwaTxt">Pasang aplikasi di HP Anda</span><button id="pwaBtn">Install</button><button id="pwaX" aria-label="Tutup">✕</button></div>
+<div id="splash"><div class="sp-box"><img src="icons/logo.png" alt=""><small>PORTAL PRESENSI</small><h1>PRESENSI SATPAM</h1><p>Sistem Kehadiran Shift &amp; Keamanan Terpadu</p><div class="sp-bar"><i id="spb"></i></div><div class="sp-t"><span id="spt">Memuat aplikasi…</span><b id="spp">0%</b></div></div></div>
+<header id="top" hidden></header><main id="app"></main><nav id="nav" hidden></nav>
+<div id="busy" hidden><div class="spin"></div></div><div id="toast" role="status"></div>
+<script src="js/config.js?v=15" defer></script><script src="js/app.js?v=15" defer></script></body></html>
