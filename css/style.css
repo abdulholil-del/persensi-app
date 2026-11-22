@@ -191,3 +191,10 @@ tr.ar[hidden],#ll .lp[hidden]{display:none}.lp.pen{border-left:5px solid #DC3545
 .th .x{position:absolute;top:4px;right:4px;min-height:28px;width:28px;padding:0;border-radius:50%;background:#0B1E44cc;color:#fff;font-size:13px}.th.add{border:1.5px dashed #94A3B8;color:var(--acc);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:14px;min-height:0;background:#fff}.th.add small{font-size:11px;color:var(--mut);font-weight:500}
 .gps{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:#ECFDF5;border-radius:12px;padding:10px 12px;margin-top:12px;font-size:13px}.gps .sm{margin-left:auto}
 .lockc{text-align:center}.lockc svg{width:40px;height:40px;color:var(--mut);margin-bottom:6px}.clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin:6px 0}.tanggapan{background:#EEF2FB;border-radius:10px;padding:8px 10px;font-size:13px}
+
+/* riwayat & profil satpam */
+.stg3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.stg3 .st{padding:10px 8px}.stg3 .st b{font-size:22px}.stg3 .st small{font-size:10px;line-height:1.2;display:block}.st.a{background:#FEF2F2;color:#991B1B}.st.d{background:#EEF2FB;color:#0B1E44}
+.comp{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0}.wk{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin:6px 0}.wk>div{text-align:center;background:#fff;border:1px solid var(--ln);border-radius:12px;padding:6px 0}.wk>div b{display:block;font-size:16px}.wk>div.today{background:var(--acc);color:#fff;border-color:var(--acc)}.wk>div.today small{color:#fff}
+.wk i{display:block;width:8px;height:8px;border-radius:50%;margin:4px auto 0;background:#CBD5E1}.wk i.s1{background:#F59E0B}.wk i.s2{background:#0D9488}.wk i.s3{background:#0F172A}.wk .today i{box-shadow:0 0 0 2px #fff}
+.jd.now{box-shadow:0 0 0 2px var(--acc2)}.jd .dt{margin:6px 0 2px;font-size:14px}.jc[hidden]{display:none}.cta{text-align:center;background:#EEF2FB}
+.pf{text-align:center;padding:8px 0}.avatar.lg{width:84px;height:84px;font-size:30px;margin:0 auto 8px}

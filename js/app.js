@@ -10,7 +10,8 @@ function splashDone(){const e=$('#splash');if(!e||e._d)return;e._d=1;splash(100,
 splash(30,'Memuat aplikasi…');
 function toast(m,e){const t=$('#toast');t.textContent=m;t.className='show'+(e?' err':'');clearTimeout(t._x);t._x=setTimeout(()=>t.className='',3200);}
 let bz=0;const busy=b=>{bz=Math.max(0,bz+(b?1:-1));clearTimeout(busy.t);if(bz)busy.t=setTimeout(()=>$('#busy').hidden=false,350);else $('#busy').hidden=true;};
-const QU=new Set(['status']),RD=new Set(['dashboard','rekap','jadwalAdmin','listPengajuan','listLaporan','master','getSekolah','laporanSaya','statSaya','jadwalSaya','absensiHari','posSaya','getFoto']),MC={};
+const APP_VER='22';
+const QU=new Set(['status']),RD=new Set(['riwayatSaya','dashboard','rekap','jadwalAdmin','listPengajuan','listLaporan','master','getSekolah','laporanSaya','statSaya','jadwalSaya','absensiHari','posSaya','getFoto']),MC={};
 async function api(a,d={},q){
   if(GAS_URL.startsWith('GANTI')){toast('GAS_URL belum diisi di js/config.js',1);throw new Error('config');}
   const ck=a+JSON.stringify(d);if(RD.has(a)&&MC[ck]&&Date.now()-MC[ck].t<20000)return MC[ck].v;
@@ -86,12 +87,13 @@ function loginView(){document.body.classList.add('lgn');nav();document.body.clas
     if((r.user.role==='admin')!==(tabRole==='admin')){toast('Akun ini bukan akun '+(tabRole==='admin'?'Pengelola Sekolah':'Satpam Lapangan'),1);return;}
     S.t=r.token;S.u=r.user;const st=$('#rm').checked?localStorage:sessionStorage;st.setItem('t',S.t);st.setItem('u',JSON.stringify(S.u));boot();};
 }
-function pwView(f){
-  $('#app').innerHTML=(f?`<div class="login"><div class="lgo"><img class="logo" src="icons/logo.png" alt=""></div><h1>Ganti Password</h1><p class="mut">Demi keamanan, buat password baru sebelum memakai aplikasi.</p></div>`:head()+`<div class="card"><b>${esc(S.u.nama)}</b><br><small>ID ${esc(S.u.id)} · ${esc(S.u.role==='admin'?'Pengelola Sekolah':'Satpam')} ${esc(S.u.pos||'')}</small></div><h2>Ganti Password</h2>`)+
-  `<div class="card"><label for="pw0">Password lama</label><input id="pw0" type="password" autocomplete="current-password"><label for="pw1">Password baru (minimal 6 karakter)</label><input id="pw1" type="password" autocomplete="new-password"><label for="pw2">Ulangi password baru</label><input id="pw2" type="password" autocomplete="new-password"><button class="big" id="pws">Simpan Password</button>${f?'<button class="sec big" id="pwx" style="margin-top:8px">Keluar</button>':''}</div>`;
-  if(f)$('#pwx').onclick=logout;
+function pwForm(f){return `<label for="pw0">Password lama</label><input id="pw0" type="password" autocomplete="current-password"><label for="pw1">Password baru (minimal 6 karakter)</label><input id="pw1" type="password" autocomplete="new-password"><label for="pw2">Ulangi password baru</label><input id="pw2" type="password" autocomplete="new-password"><button class="big" id="pws">Simpan Password</button>${f?'<button class="sec big" id="pwx" style="margin-top:8px">Keluar</button>':''}`;}
+function pwBind(f,done){if(f)$('#pwx').onclick=logout;
   $('#pws').onclick=async()=>{const a=$('#pw0').value,b=$('#pw1').value;if(b.length<6)return toast('Password baru minimal 6 karakter',1);if(b!==$('#pw2').value)return toast('Konfirmasi password tidak sama',1);if(a===b)return toast('Password baru tidak boleh sama dengan yang lama',1);
-    await api('gantiPassword',{lama:a,baru:b});S.u.wajib=false;[localStorage,sessionStorage].forEach(x=>{if(x.getItem('u'))x.setItem('u',JSON.stringify(S.u));});toast('Password berhasil diganti');if(f)boot();else pwView(0);};}
+    await api('gantiPassword',{lama:a,baru:b});S.u.wajib=false;[localStorage,sessionStorage].forEach(x=>{if(x.getItem('u'))x.setItem('u',JSON.stringify(S.u));});toast('Password berhasil diganti');done();};}
+function pwView(f){
+  $('#app').innerHTML=(f?`<div class="login"><div class="lgo"><img class="logo" src="icons/logo.png" alt=""></div><h1>Ganti Password</h1><p class="mut">Demi keamanan, buat password baru sebelum memakai aplikasi.</p></div>`:head()+`<div class="card"><b>${esc(S.u.nama)}</b><br><small>ID ${esc(S.u.id)} · ${esc(S.u.role==='admin'?'Pengelola Sekolah':'Satpam')} ${esc(S.u.pos||'')}</small></div><h2>Ganti Password</h2>`)+`<div class="card">${pwForm(f)}</div>`;
+  pwBind(f,()=>{if(f)boot();else pwView(0);});}
 function isiSatpam(id){const x=S.ms.find(q=>String(q.id)===String(id));if(!x)return;$('#si').value=x.id;$('#sn').value=x.nama;$('#so').value=x.pos;$('#sr').value=x.role;$('#sa').value=x.aktif||'Y';$('#sp').value='';$('#si').scrollIntoView({behavior:'smooth',block:'center'});}
 function isiPos(i){const q=S.mp[i];$('#pn').value=q.nama;$('#pa').value=q.lat;$('#po').value=q.lng;$('#pr').value=q.radius_m||100;$('#pn').scrollIntoView({behavior:'smooth',block:'center'});}
 async function resetPw(id){const p=prompt('Password sementara untuk '+id+' (min. 6 karakter). Satpam wajib menggantinya saat login:');if(!p)return;await api('resetPassword',{id,pin:p});toast('Password direset');}
@@ -119,7 +121,18 @@ async home(){clearInterval(S.tm);const [r,st,lp]=await Promise.all([api('status'
       if(d<=0&&c.dataset.rl&&Date.now()-(S._rlT||0)>5000){S._rlT=Date.now();setTimeout(()=>{if(S.tab==='home'&&!document.querySelector('.cam'))go('home');},700);}});
     document.querySelectorAll('.abs[data-da]').forEach(b=>{if(n>+b.dataset.da&&!b.classList.contains('late')){b.classList.add('late');const l=b.querySelector('.al');if(l)l.textContent='ABSEN DATANG (TERLAMBAT) →';}});};
   tick();S.tm=setInterval(tick,1000);},
-async profil(){pwView(0);},
+async profil(){const b=today().slice(0,7),[st,ps]=await Promise.all([api('statSaya',{bulan:b}),api('posSaya')]),ini=S.u.nama.split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase(),H=st.H||0,T=st.T||0,PC=st.PC||0,A=st.A||0,dn=H+T+PC+A,dis=dn?Math.round(H/dn*1000)/10:0;
+  $('#app').innerHTML=`<div class="pf"><div class="avatar lg">${esc(ini)}</div><h1>${esc(S.u.nama)}</h1><span class="tag H">AKTIF</span><small class="mut" style="display:block;margin-top:4px">Satpam · ID ${esc(S.u.id)}</small></div>
+  <div class="card"><div class="row"><span class="mut">Pos jaga</span><b style="text-align:right">${esc(ps.nama||S.u.pos||'–')}</b></div><div class="row" style="margin-top:6px"><span class="mut">Radius presensi</span><b style="text-align:right">${ps.lat!=null?esc(ps.radius)+' m':'Belum diatur'}</b></div></div>
+  <h2>Kedisiplinan bulan ini</h2><div class="card"><div class="row"><b>Skor disiplin</b><b class="mono" id="dsk" style="text-align:right">${dn?dis+'%':'–'}</b></div><div class="hb" style="height:10px"><i style="width:${dis}%"></i></div>
+  <div class="stg3" style="margin-top:10px">${[['HADIR','h',H],['TERLAMBAT','t',T],['PULANG CEPAT','p',PC],['IZIN / SAKIT','i',(st.I||0)+(st.S||0)],['ALPA','a',A],['LAPORAN','d',st.Laporan||0]].map(x=>`<div class="st ${x[1]}"><small>${x[0]}</small><b>${x[2]}</b></div>`).join('')}</div><small class="mut">Skor = hadir tepat waktu dibagi seluruh shift yang sudah berjalan (tidak termasuk izin/sakit).</small></div>
+  <h2>Keamanan</h2><div class="card"><button class="sec big" id="pwt" aria-expanded="false">Ganti password</button><div id="pwb" hidden style="margin-top:12px">${pwForm(0)}</div></div>
+  <h2>Aplikasi</h2><div class="card"><div class="row"><span class="mut">Versi aplikasi</span><b style="text-align:right" id="ver">v${APP_VER}</b></div>${standalone?'':'<button class="sec big" id="pin" style="margin-top:10px">Pasang di layar utama</button>'}<button class="sec big" id="pcb" style="margin-top:10px">Bersihkan cache & muat ulang</button><small class="mut">Gunakan bila tampilan tidak sesuai setelah pembaruan. Anda perlu login lagi.</small></div>
+  <button class="bad big" id="pko" style="margin-top:14px">Keluar</button>`;
+  $('#pwt').onclick=()=>{const x=$('#pwb');x.hidden=!x.hidden;$('#pwt').setAttribute('aria-expanded',String(!x.hidden));if(!x.hidden)$('#pw0').focus();};pwBind(0,()=>V.profil());
+  const pi=$('#pin');if(pi)pi.onclick=()=>$('#pwaBtn').click();
+  $('#pcb').onclick=()=>{if(!confirm('Aplikasi akan dimuat ulang dan Anda perlu login lagi. Lanjutkan?'))return;if(window.__wipe)window.__wipe();else{localStorage.clear();sessionStorage.clear();location.reload();}};$('#pko').onclick=logout;},
+
 async laporan(){clearInterval(S.tm);const [r,l,ps]=await Promise.all([api('status'),api('laporanSaya'),api('posSaya')]);S.off=r.now-Date.now();
   const it=r.items.find(i=>i.state==='pulang'),dk='ld_'+S.u.id,F={j:'',t:'Biasa',f:[],g:null},AR=typeof AREA!=='undefined'?AREA:AREA_DEF,
   JN=[['Patroli','Patroli lingkungan','<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>'],['Kejadian/Insiden','Kejadian / insiden','<path d="M12 3l10 18H2zM12 10v5M12 18v.5"/>'],['Tamu','Tamu & pengunjung','<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>'],['Kendaraan','Kendaraan & parkir','<path d="M5 16V11l2-5h10l2 5v5M3 16h18M7 19v-3M17 19v-3"/>'],['Serah Terima','Serah terima','<path d="M7 7h12l-3-3M17 17H5l3 3"/>'],['Lainnya','Lainnya','<circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>']],
@@ -158,10 +171,35 @@ async izin(){const t=today();$('#app').innerHTML=head()+`<h2>Ajukan Izin / Sakit
   <button class="big" id="zb">Kirim Pengajuan</button></div><p class="mut">Pengajuan perlu persetujuan admin. Selama menunggu, absen untuk shift tersebut terkunci.</p>`;
   let f;$('#zf').onclick=async()=>{f=(await pilihFoto(0))[0];$('#zc').textContent='foto terpilih';};
   $('#zb').onclick=async()=>{await api('ajukan',{tanggal:$('#zt').value,kode:$('#zk').value,jenis:$('#zj').value,ket:$('#zs').value,foto:f});toast('Pengajuan terkirim');V.izin();};},
-async jadwal(){const b=S.vb||today().slice(0,7);S.vb=b;const j=await api('jadwalSaya',{bulan:b}),td=today(),NM={1:'Pagi 08:00–16:00',2:'Sore 16:00–00:00',3:'Malam 00:00–08:00'},dn=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'],c=[1,2,3].map(k=>j.filter(x=>x.kode===k).length);
-  $('#app').innerHTML=head()+`<h1>Jadwal Shift</h1><input id="vb" type="month" value="${b}"><div class="stg" style="grid-template-columns:repeat(3,1fr);margin-bottom:8px"><div class="st" style="background:#FEF3C7;color:#92400E"><small>PAGI</small><b>${c[0]}</b></div><div class="st" style="background:#CCFBF1;color:#115E59"><small>SORE</small><b>${c[1]}</b></div><div class="st" style="background:#E2E8F0;color:#0F172A"><small>MALAM</small><b>${c[2]}</b></div></div>`+
-  (j.map(x=>`<div class="card jd j${x.kode}"><div class="row"><b>${dn[new Date(x.tanggal+'T00:00:00').getDay()]}, ${x.tanggal.slice(8)}/${x.tanggal.slice(5,7)}</b>${x.tanggal===td?'<span class="tag H" style="flex:0;white-space:nowrap">HARI INI</span>':''}</div><small>Shift ${x.kode} · ${NM[x.kode]}</small></div>`).join('')||'<div class="card mut">Belum ada jadwal bulan ini.</div>');
-  $('#vb').onchange=e=>{S.vb=e.target.value;V.jadwal();};}
+async jadwal(){const b=S.vb||today().slice(0,7);S.vb=b;const [j,rw]=await Promise.all([api('jadwalSaya',{bulan:b}),api('riwayatSaya',{bulan:b})]),td=today(),n0=new Date(Date.now()+S.off),
+  nowM=+n0.toLocaleString('en-GB',{hour:'numeric',hour12:false,timeZone:'Asia/Jakarta'})*60+ +n0.toLocaleString('en-GB',{minute:'numeric',timeZone:'Asia/Jakarta'}),BK={1:360,2:840,3:-1},
+  NM={1:'Pagi 08:00–16:00',2:'Sore 16:00–00:00',3:'Malam 00:00–08:00'},HR=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'],used={},X=[];
+  const ftg=t=>{const d=new Date(t+'T00:00:00');return HR[d.getDay()]+', '+d.getDate()+' '+d.toLocaleDateString('id-ID',{month:'short'});};
+  j.forEach(x=>{const a=rw.find(r=>r.tanggal===x.tanggal&&+r.kode_shift===+x.kode);if(a)used[a.tanggal+'|'+a.kode_shift]=1;X.push({tanggal:x.tanggal,kode:+x.kode,a:a||null});});
+  rw.forEach(a=>{if(!used[a.tanggal+'|'+a.kode_shift])X.push({tanggal:a.tanggal,kode:+a.kode_shift,a:a});});
+  const sk=x=>{if(x.a){const s=String(x.a.status);if(s==='A')return 'A';if(s==='I'||s==='S')return 'IS';if(s.indexOf('T')===0)return 'T';if(s.indexOf('PC')>=0)return 'PC';return 'H';}
+    if(x.tanggal<td)return 'A';if(x.tanggal>td)return 'UP';return nowM<BK[x.kode]?'UP':'BL';};
+  const up=X.filter(x=>sk(x)==='UP').sort((p,q)=>p.tanggal<q.tanggal?-1:1),ri=X.filter(x=>sk(x)!=='UP').sort((p,q)=>p.tanggal<q.tanggal?1:-1),cnt=k=>ri.filter(x=>sk(x)===k).length,
+  H=cnt('H'),T=cnt('T'),PC=cnt('PC'),IS=cnt('IS'),A=cnt('A'),dn=H+T+PC+A,dis=dn?Math.round(H/dn*1000)/10:0,c3=[1,2,3].map(k=>j.filter(x=>+x.kode===k).length),fv=S.vf||'';
+  const LB={H:['HADIR','H'],T:['TERLAMBAT','T'],PC:['PULANG CEPAT','PC'],A:['ALPA','A'],BL:['BELUM ABSEN','Menunggu'],UP:['AKAN DATANG','']},
+  cd=x=>{const s=sk(x),a=x.a,l=s==='IS'?[a.status==='S'?'SAKIT':'IZIN',a.status]:(s==='A'&&!a?['TIDAK ABSEN','A']:LB[s]),dj=a&&a.jam_masuk&&!isNaN(+a.jam_masuk),
+    jr=a&&a.jarak_masuk!==''&&a.jarak_masuk!=null?' · '+esc(a.jarak_masuk)+' m dari pos':'';
+    return `<div class="card jd j${x.kode} jc${x.tanggal===td?' now':''}" data-s="${s}"><div class="row"><b>${esc(ftg(x.tanggal))}</b><span class="chip s${x.kode}" style="flex:0">Shift ${x.kode}</span><span class="tag ${l[1]}" style="flex:0;white-space:nowrap">${l[0]}</span></div>
+    <small>${NM[x.kode]}${x.tanggal===td?' · <b>HARI INI</b>':''}</small>${dj?`<div class="dt">Datang <b>${jam(+a.jam_masuk)}</b> · Pulang <b>${a.jam_pulang&&!isNaN(+a.jam_pulang)?jam(+a.jam_pulang):'–'}</b>${jr}</div>`:''}
+    ${a&&a.catatan?`<small class="mut">${esc(a.catatan)}</small>`:''}${a&&a.dikoreksi?'<small class="mut"><br>Dikoreksi oleh pengelola</small>':''}</div>`;},
+  wkd=(()=>{const g=new Date(td+'T00:00:00').getDay(),dw=(g+6)%7;return Array.from({length:7},(_,i)=>{const t=geser(td,i-dw),x=j.find(y=>y.tanggal===t);return {t:t,n:['Sen','Sel','Rab','Kam','Jum','Sab','Min'][i],d:+t.slice(8),k:x?+x.kode:0};});})();
+  $('#app').innerHTML=head()+`<h1>Jadwal & Riwayat</h1><input id="vb" type="month" value="${b}" aria-label="Pilih bulan">
+  <div class="stg3">${[['HADIR','h',H],['TERLAMBAT','t',T],['PULANG CEPAT','p',PC],['IZIN / SAKIT','i',IS],['ALPA','a',A],['DISIPLIN','d',dn?dis+'%':'–']].map(x=>`<div class="st ${x[1]}"><small>${x[0]}</small><b>${x[2]}</b></div>`).join('')}</div>
+  <div class="comp"><span class="chip s1">Pagi ${c3[0]}</span><span class="chip s2">Sore ${c3[1]}</span><span class="chip s3">Malam ${c3[2]}</span><small class="mut">jadwal bulan ini</small></div>
+  ${b===td.slice(0,7)?`<h2>Pekan ini</h2><div class="wk">${wkd.map(w=>`<div class="${w.t===td?'today':''}"><small>${w.n}</small><b>${w.d}</b><i class="${w.k?'s'+w.k:''}"></i></div>`).join('')}</div>`:''}
+  <div class="fchips" style="margin:12px 0 4px">${[['','Semua'],['H','Hadir'],['T','Terlambat'],['PC','Pulang cepat'],['IS','Izin/Sakit'],['A','Alpa']].map(([k,l])=>`<button data-k="${k}" class="${fv===k?'on':''}">${l}</button>`).join('')}</div>
+  <div id="sup">${up.length?`<h2>Jadwal mendatang</h2>${up.slice(0,7).map(cd).join('')}`:''}</div>
+  <div id="sri"><h2>Riwayat</h2>${ri.map(cd).join('')||'<div class="card mut">Belum ada riwayat pada bulan ini.</div>'}</div><div id="sem" class="card mut" hidden>Tidak ada data untuk filter ini.</div>
+  <div class="card cta"><b>Perlu penyesuaian jadwal?</b><p class="mut" style="margin:4px 0 10px">Ajukan izin atau sakit sebelum shift dimulai.</p><button class="big" onclick="go('izin')">Ajukan Izin / Sakit</button></div>`;
+  $('#vb').onchange=e=>{S.vf='';S.vb=e.target.value;V.jadwal();};
+  const ft=()=>{let m=0;document.querySelectorAll('.jc').forEach(c=>{const v=!S.vf||c.dataset.s===S.vf;c.hidden=!v;if(v)m++;});$('#sem').hidden=!(m===0&&(up.length+ri.length)>0);$('#sup').hidden=!!S.vf;};
+  document.querySelectorAll('.fchips button').forEach(bt=>bt.onclick=()=>{S.vf=bt.dataset.k;document.querySelectorAll('.fchips button').forEach(y=>y.classList.toggle('on',y===bt));ft();});ft();}
+
 };
 const jarak=(a,b,c,d)=>{const R=6371000,r=x=>x*Math.PI/180,h=Math.sin(r(c-a)/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(r(d-b)/2)**2;return Math.round(2*R*Math.asin(Math.sqrt(h)));};
 const STL={H:'Hadir tepat waktu',T:'Terlambat',PC:'Pulang cepat','T+PC':'Terlambat & pulang cepat'};
