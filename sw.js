@@ -1,4 +1,4 @@
-const V='22',C='presensi-v'+V,F=['./','index.html','css/style.css?v='+V,'js/config.js?v='+V,'js/app.js?v='+V,'manifest.webmanifest','icons/icon-192.png','icons/logo.png'];
+const V='24',C='presensi-v'+V,F=['./','index.html','css/style.css?v='+V,'js/config.js?v='+V,'js/app.js?v='+V,'manifest.webmanifest','icons/icon-192.png','icons/logo.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(F)).catch(()=>{}));self.skipWaiting();});
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))).then(()=>self.clients.claim())));
 // halaman utama: selalu ambil yang terbaru dari jaringan (cache hanya cadangan offline); aset berversi: cache dulu agar cepat

@@ -45,3 +45,9 @@ Android/Chrome: tekan **Install** pada banner atas. iPhone/Safari: **Bagikan →
 
 Lewat batas datang = **T**. Pulang sebelum jendela atau lupa pulang = **PC**. Tidak absen dan tanpa pengajuan = **A**. Izin/Sakit = **I/S** setelah disetujui admin.
 Jam yang dipakai adalah jam server (WIB). Shift 3 pada tanggal D dimulai pukul 00:00 tanggal D.
+
+## F. Catatan kinerja (cache)
+- Backend menyimpan **cache server** untuk lembar Satpam, Pos, Jadwal, Pengajuan, Absensi, dan Laporan. Cache **otomatis dibuang setiap ada penulisan lewat aplikasi**, jadi data selalu segar.
+- Jika Anda **mengedit lembar langsung di Google Sheets** (bukan lewat aplikasi), perubahannya baru terlihat di aplikasi dalam **maksimal 5 menit** (masa berlaku cache). Lembar yang sangat besar (lebih dari sekitar 600 ribu huruf) tidak di-cache sehingga tetap dibaca langsung.
+- Aplikasi di HP juga menyimpan salinan sementara data dashboard, rekap, riwayat, dan statistik untuk tampilan instan. Salinan itu dihapus saat **Keluar**, dan disimpan di sesi sementara bila "Ingat saya" tidak dicentang.
+- Setiap kali `Kode.gs` diubah: **Deploy → Manage deployments → ikon pensil → New version → Deploy** (alamat `/exec` tetap).

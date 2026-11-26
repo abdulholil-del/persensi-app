@@ -10,14 +10,36 @@ function splashDone(){const e=$('#splash');if(!e||e._d)return;e._d=1;splash(100,
 splash(30,'Memuat aplikasi…');
 function toast(m,e){const t=$('#toast');t.textContent=m;t.className='show'+(e?' err':'');clearTimeout(t._x);t._x=setTimeout(()=>t.className='',3200);}
 let bz=0;const busy=b=>{bz=Math.max(0,bz+(b?1:-1));clearTimeout(busy.t);if(bz)busy.t=setTimeout(()=>$('#busy').hidden=false,350);else $('#busy').hidden=true;};
-const APP_VER='22';
-const QU=new Set(['status']),RD=new Set(['riwayatSaya','dashboard','rekap','jadwalAdmin','listPengajuan','listLaporan','master','getSekolah','laporanSaya','statSaya','jadwalSaya','absensiHari','posSaya','getFoto']),MC={};
+const APP_VER='24';
+const QU=new Set(['status']),RD=new Set(['izinOpsi','pengajuanSaya','riwayatSaya','dashboard','rekap','jadwalAdmin','listPengajuan','listLaporan','master','getSekolah','laporanSaya','statSaya','jadwalSaya','absensiHari','posSaya','getFoto']),MC={};
+// Prinsip "instan": (1) banyak pembacaan dikirim sebagai SATU permintaan, (2) permintaan kembar dibagi, (3) data lama dari HP ditampilkan dulu lalu diperbarui diam-diam.
+const SW=new Set(['dashboard','rekap','riwayatSaya','jadwalSaya','statSaya']),BT=new Set(Array.from(RD).concat(['status']).filter(x=>x!=='getFoto')),FL={};let BQ=[],btm=0,rvT=0;
+const lcS=()=>localStorage.getItem('u')?localStorage:sessionStorage,lcK=ck=>'lc_'+(S.u&&S.u.id)+'_'+ck;
+const lcGet=ck=>{try{const x=JSON.parse(lcS().getItem(lcK(ck))||'null');return x&&Date.now()-x.t<864e5?x.v:undefined;}catch(e){return undefined;}};
+const lcSet=(ck,v)=>{try{lcS().setItem(lcK(ck),JSON.stringify({t:Date.now(),v:v}));}catch(e){}};
+const lcClear=()=>{[localStorage,sessionStorage].forEach(st=>{try{Object.keys(st).filter(k=>k.indexOf('lc_')===0).forEach(k=>st.removeItem(k));}catch(e){}});};
+async function rawCall(a,d){const r=await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:a,token:S.t,data:d})}),j=await r.json();if(!j.success){if(j.auth)logout();throw new Error(j.message);}return j.data;}
+let NB=0;   // 1 = backend lama (belum mengenal 'batch'): kembali ke permintaan satu per satu
+function viaBatch(a,d){if(NB)return rawCall(a,d);return new Promise((res,rej)=>{BQ.push({a:a,d:d,res:res,rej:rej});if(!btm)btm=setTimeout(flushBQ,12);});}
+async function flushBQ(){btm=0;const q=BQ;BQ=[];if(!q.length)return;
+  try{if(q.length===1){q[0].res(await rawCall(q[0].a,q[0].d));return;}
+    let out;try{out=await rawCall('batch',{calls:q.map(x=>({a:x.a,d:x.d}))});}catch(e){if(/tidak dikenal/i.test(e.message)){NB=1;await Promise.all(q.map(x=>rawCall(x.a,x.d).then(x.res,x.rej)));return;}throw e;}
+    q.forEach((x,i)=>{const o=out&&out[i];if(o&&o.ok)x.res(o.data);else x.rej(new Error(o&&o.message||'Gagal'));});}
+  catch(e){q.forEach(x=>x.rej(e));}}
+function fetchRead(a,d,ck){if(FL[ck])return FL[ck];const p=(BT.has(a)?viaBatch(a,d):rawCall(a,d)).then(v=>{if(RD.has(a)){MC[ck]={t:Date.now(),v:v};if(SW.has(a))lcSet(ck,v);}return v;});FL[ck]=p;const done=()=>{delete FL[ck];};p.then(done,done);return p;}
+function revalidate(a,d,ck,old){const tab=S.tab;fetchRead(a,d,ck).then(v=>{if(JSON.stringify(v)!==JSON.stringify(old))rerender(tab);}).catch(()=>{});}
+function rerender(tab){clearTimeout(rvT);rvT=setTimeout(()=>{if(!S.u||S.tab!==tab)return;const ae=document.activeElement;
+  if(document.querySelector('.cam,.okscreen,.modal,.lf')||(ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)))return;   // jangan mengganggu formulir, kamera, atau jendela yang sedang terbuka
+  const v=(S.u.role==='admin'?A:V)[tab];if(v)Promise.resolve(v()).then(()=>{if(S.u&&S.u.role==='admin')cardTools();}).catch(()=>{});},80);}
 async function api(a,d={},q){
   if(GAS_URL.startsWith('GANTI')){toast('GAS_URL belum diisi di js/config.js',1);throw new Error('config');}
-  const ck=a+JSON.stringify(d);if(RD.has(a)&&MC[ck]&&Date.now()-MC[ck].t<20000)return MC[ck].v;
-  const ov=!q&&!RD.has(a)&&!QU.has(a);if(ov)busy(1);try{const r=await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:a,token:S.t,data:d})});
-    const j=await r.json();if(!j.success){if(j.auth)logout();throw new Error(j.message);}if(RD.has(a))MC[ck]={t:Date.now(),v:j.data};else if(a!=='login'&&a!=='status')for(const x in MC)delete MC[x];return j.data;
-  }catch(e){toast(e.message==='Failed to fetch'?'Tidak ada koneksi internet':e.message,1);throw e;}finally{if(ov)busy(0);}
+  const ck=a+JSON.stringify(d),rd=RD.has(a);
+  if(rd&&MC[ck]&&Date.now()-MC[ck].t<20000)return MC[ck].v;
+  if(SW.has(a)){const c=lcGet(ck);if(c!==undefined){revalidate(a,d,ck,c);return c;}}
+  const ov=!q&&!rd&&!QU.has(a);if(ov)busy(1);
+  try{if(rd||BT.has(a))return await fetchRead(a,d,ck);
+    const v=await rawCall(a,d);if(a!=='login'){for(const x in MC)delete MC[x];lcClear();}return v;
+  }catch(e){toast(/Failed to fetch|NetworkError/i.test(e.message)?'Tidak ada koneksi internet':e.message,1);throw e;}finally{if(ov)busy(0);}
 }
 function logout(){document.body.classList.remove('adm','sb-open','sb-off');localStorage.clear();sessionStorage.clear();S.t=null;S.u=null;boot();}
 // ---- foto & GPS ----
@@ -64,7 +86,8 @@ function topbar(){const t=$('#top');if(!t)return;const ad=S.u.role==='admin',ini
 addEventListener('click',e=>{if(!e.target.closest('.pop'))closePops();if(document.body.classList.contains('sb-open')&&!e.target.closest('#nav,#top'))document.body.classList.remove('sb-open');});
 
 function head(){return '';return `<div class="row"><h1>${esc(S.u.nama)}</h1><button class="sec" onclick="logout()" style="flex:0">Keluar</button></div>`;}
-function go(k){clearInterval(S.tm);S.tab=k;$('#app').dataset.crumb=(S.nl&&S.nl[k])||'';document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.k===k));$('#app').innerHTML='<div class="sk"></div><div class="sk"></div><div class="sk s"></div>';Promise.resolve((S.u.role==='admin'?A:V)[k]()).then(()=>{if(S.u.role==='admin')document.querySelectorAll('.card>h2:first-child').forEach(h=>{if(h.querySelector('.tl'))return;const b=document.createElement('button');b.className='tl';b.textContent='−';b.setAttribute('aria-label','Ciutkan kartu');b.onclick=()=>{const c=h.parentElement.classList.toggle('cl');b.textContent=c?'+':'−';};h.appendChild(b);});}).catch(e=>{if(document.querySelector('#app .sk'))$('#app').innerHTML='<div class="card"><b>Gagal memuat halaman</b><p class="mut">'+esc(e&&e.message)+'</p><button onclick="go(S.tab)">Coba lagi</button></div>';}).finally(splashDone);}
+function cardTools(){if(S.u.role==='admin')document.querySelectorAll('.card>h2:first-child').forEach(h=>{if(h.querySelector('.tl'))return;const b=document.createElement('button');b.className='tl';b.textContent='−';b.setAttribute('aria-label','Ciutkan kartu');b.onclick=()=>{const c=h.parentElement.classList.toggle('cl');b.textContent=c?'+':'−';};h.appendChild(b);});}
+function go(k){clearInterval(S.tm);S.tab=k;$('#app').dataset.crumb=(S.nl&&S.nl[k])||'';document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.k===k));$('#app').innerHTML='<div class="sk"></div><div class="sk"></div><div class="sk s"></div>';Promise.resolve((S.u.role==='admin'?A:V)[k]()).then(cardTools).catch(e=>{if(document.querySelector('#app .sk'))$('#app').innerHTML='<div class="card"><b>Gagal memuat halaman</b><p class="mut">'+esc(e&&e.message)+'</p><button onclick="go(S.tab)">Coba lagi</button></div>';}).finally(splashDone);}
 let tabRole='satpam',clk;
 function loginView(){document.body.classList.add('lgn');nav();document.body.classList.remove('adm','hdr');
   $('#app').innerHTML=`<div class="sl"><section class="sl-l"><div class="sl-in"><div class="sl-brand"><img src="icons/logo.png" alt="Logo"><div><b>${esc(SEKOLAH.nama.toUpperCase())}</b><small>Portal Digital</small></div></div>
@@ -166,11 +189,33 @@ async laporan(){clearInterval(S.tm);const [r,l,ps]=await Promise.all([api('statu
     const b=$('#kirim');b.disabled=true;
     try{await api('laporan',{jenis:j,lokasi:lo,uraian:u,tingkat:F.t,fotos:F.f,lat:F.g?F.g.lat:null,lng:F.g?F.g.lng:null});clearTimeout(S._dt);localStorage.removeItem(dk);hasilLap(it,j,F.t,F.f.length);}catch(e){b.disabled=false;}};
 },
-async izin(){const t=today();$('#app').innerHTML=head()+`<h2>Ajukan Izin / Sakit</h2><div class="card"><label>Tanggal shift</label><input id="zt" type="date" value="${t}"><label>Shift</label><select id="zk"><option value="1">Shift 1</option><option value="2">Shift 2</option><option value="3">Shift 3</option></select>
-  <label>Jenis</label><select id="zj"><option>Izin</option><option>Sakit</option></select><label>Keterangan</label><textarea id="zs" rows="3"></textarea><button class="sec" id="zf">📎 Foto bukti (opsional)</button> <small id="zc"></small><br><br>
-  <button class="big" id="zb">Kirim Pengajuan</button></div><p class="mut">Pengajuan perlu persetujuan admin. Selama menunggu, absen untuk shift tersebut terkunci.</p>`;
-  let f;$('#zf').onclick=async()=>{f=(await pilihFoto(0))[0];$('#zc').textContent='foto terpilih';};
-  $('#zb').onclick=async()=>{await api('ajukan',{tanggal:$('#zt').value,kode:$('#zk').value,jenis:$('#zj').value,ket:$('#zs').value,foto:f});toast('Pengajuan terkirim');V.izin();};},
+async izin(){clearInterval(S.tm);const [op,my]=await Promise.all([api('izinOpsi'),api('pengajuanSaya')]),NM={1:'Pagi 08:00–16:00',2:'Sore 16:00–00:00',3:'Malam 00:00–08:00'},F={j:'Sakit',s:null,f:null},
+  kd=t=>{const d=new Date(t+'T00:00:00');return d.toLocaleDateString('id-ID',{weekday:'short',day:'numeric',month:'short'});},ST={Menunggu:'MENUNGGU KONFIRMASI',Disetujui:'DISETUJUI',Ditolak:'DITOLAK'},
+  hist=my.map(x=>{const tm=x.dibuat_pada&&!isNaN(+x.dibuat_pada)?' · diajukan '+jam(+x.dibuat_pada)+' WIB':'';
+    return `<div class="card pj p-${esc(x.status)}" id="pj_${esc(x.id)}"><div class="row"><b>${x.jenis==='Sakit'?'Sakit (S)':'Izin (I)'}</b><span class="tag ${esc(x.status)}" style="flex:0;white-space:nowrap">${ST[x.status]||esc(x.status).toUpperCase()}</span></div>
+    <small>${esc(kd(x.tanggal))} · Shift ${esc(x.kode_shift)}${tm}${x.ada_bukti?' · bukti terlampir':''}</small><p class="clamp">${esc(x.keterangan)}</p>
+    ${x.status==='Ditolak'?`<div class="tgp"><b>Catatan penolakan:</b> ${x.catatan_admin?esc(x.catatan_admin):'tidak ada keterangan, hubungi pengelola'}</div>`:''}${x.status!=='Menunggu'&&x.diproses_oleh?`<small class="mut">Diproses oleh ${esc(x.diproses_oleh)}</small>`:''}
+    ${x.status==='Menunggu'?`<button class="sec sm" data-bt="${esc(x.id)}" style="margin-top:8px">Batalkan pengajuan</button>`:''}</div>`;}).join('')||'<div class="card mut">Belum ada pengajuan.</div>';
+  $('#app').innerHTML=`<h1>Pengajuan Izin / Sakit</h1><div class="warn" style="margin:0 0 10px">Pengajuan hanya berlaku untuk shift yang belum diabsen. Setelah dikirim, tombol absen untuk shift itu terkunci sampai pengelola memprosesnya.</div>`+
+  (op.length?`<div class="card lf"><label>Jenis ketidakhadiran</label><div class="tg2"><button type="button" class="tb on" data-j="Sakit">Sakit (S)</button><button type="button" class="tb" data-j="Izin">Izin Resmi (I)</button></div>
+  <label>Shift & tanggal berhalangan <span class="req">wajib</span></label><div id="zl">${op.map((o,i)=>`<button type="button" class="zo" data-i="${i}"><b>${esc(kd(o.tanggal))}</b><small>Shift ${o.kode} · ${NM[o.kode]} WIB</small></button>`).join('')}</div>
+  <label for="ik">Alasan & keterangan rinci <span class="req">wajib</span><span id="ic" class="mut" style="float:right">0/300</span></label><textarea id="ik" rows="3" maxlength="300" placeholder="Contoh: demam tinggi 38,5°C, diperiksa di puskesmas…"></textarea>
+  <label>Bukti surat dokter / undangan <span class="mut" style="font-weight:400">(opsional)</span></label><div id="zf" class="fg"></div><button class="big" id="zs">Kirim Pengajuan</button></div>`:
+  `<div class="card lockc"><b>Tidak ada shift yang bisa diajukan</b><p class="mut">Pengajuan hanya untuk shift terjadwal yang belum diabsen dan belum berakhir. Pastikan jadwal Anda sudah diisi pengelola.</p></div>`)+`<h2>Riwayat pengajuan</h2>${hist}`;
+  document.querySelectorAll('[data-bt]').forEach(b=>b.onclick=async()=>{if(!confirm('Batalkan pengajuan ini? Shift tersebut akan bisa diabsen kembali.'))return;const c=$('#pj_'+b.dataset.bt);c.hidden=true;
+    try{await api('batalkanPengajuan',{id:b.dataset.bt});toast('Pengajuan dibatalkan');V.izin();}catch(e){c.hidden=false;}});
+  if(!op.length)return;
+  const $$=q=>document.querySelectorAll(q),drawF=()=>{$('#zf').innerHTML=F.f?`<div class="th"><img src="${esc(F.f)}" alt="Bukti"><button type="button" class="x" id="zx" aria-label="Hapus bukti">✕</button></div>`:`<button type="button" class="th add" id="za"><span>+ Foto / dokumen</span></button>`;};
+  $$('.tb').forEach(b=>b.onclick=()=>{F.j=b.dataset.j;$$('.tb').forEach(y=>y.classList.toggle('on',y===b));});
+  $$('.zo').forEach(b=>b.onclick=()=>{F.s=F.s===+b.dataset.i?null:+b.dataset.i;$$('.zo').forEach(y=>y.classList.toggle('on',F.s!==null&&+y.dataset.i===F.s));});
+  if(op.length===1){F.s=0;$$('.zo')[0].classList.add('on');}
+  $('#ik').oninput=()=>{$('#ic').textContent=$('#ik').value.length+'/300';};drawF();
+  $('#zf').onclick=async e=>{if(e.target.closest('#zx')){F.f=null;drawF();return;}if(e.target.closest('#za')){const d=await pilihBukti();if(d){F.f=d;drawF();}}};
+  $('#zs').onclick=async()=>{const k=$('#ik').value.trim();if(F.s===null)return toast('Pilih shift yang berhalangan',1);if(k.length<5)return toast('Alasan minimal 5 huruf',1);
+    const o=op[F.s],b=$('#zs');b.disabled=true;try{await api('ajukan',{tanggal:o.tanggal,kode:o.kode,jenis:F.j,ket:k,foto:F.f});
+      $('#app').innerHTML=`<div class="okscreen"><div class="okc H">${svg('<path d="M5 12.5l4.5 4.5L19 7"/>',44)}</div><h1>Pengajuan terkirim</h1><span class="tag Menunggu">MENUNGGU KONFIRMASI</span><p class="mut">${esc(F.j)} · ${esc(kd(o.tanggal))} · Shift ${o.kode}</p><div class="warn">Pengelola akan memprosesnya. Tombol absen untuk shift ini terkunci selama menunggu.</div>
+      <button class="big abs" onclick="go('izin')">Lihat riwayat pengajuan</button><button class="sec big" style="margin-top:8px" onclick="boot()">Kembali ke Beranda</button></div>`;}catch(e){b.disabled=false;}};
+},
 async jadwal(){const b=S.vb||today().slice(0,7);S.vb=b;const [j,rw]=await Promise.all([api('jadwalSaya',{bulan:b}),api('riwayatSaya',{bulan:b})]),td=today(),n0=new Date(Date.now()+S.off),
   nowM=+n0.toLocaleString('en-GB',{hour:'numeric',hour12:false,timeZone:'Asia/Jakarta'})*60+ +n0.toLocaleString('en-GB',{minute:'numeric',timeZone:'Asia/Jakarta'}),BK={1:360,2:840,3:-1},
   NM={1:'Pagi 08:00–16:00',2:'Sore 16:00–00:00',3:'Malam 00:00–08:00'},HR=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'],used={},X=[];
@@ -315,7 +360,7 @@ async pengajuan(){const r=await api('listPengajuan'),f=S.pf||'Semua',c=x=>r.filt
   $('#app').innerHTML=`<div class="hero"><small style="color:#fff9">MANAJEMEN PENGAJUAN</small><h1>Izin & Sakit Satpam</h1><p>Tinjau bukti, lalu setujui atau tolak. Keputusan langsung masuk ke rekap.</p></div>
   <div class="kpis3"><div class="kpi" style="--c:#F59E0B"><b>${c('Menunggu')}</b><small>Menunggu</small></div><div class="kpi" style="--c:#10B981"><b>${c('Disetujui')}</b><small>Disetujui</small></div><div class="kpi" style="--c:#EF4444"><b>${c('Ditolak')}</b><small>Ditolak</small></div></div>
   <div class="seg tabs" style="margin:12px 0">${['Semua','Menunggu','Disetujui','Ditolak'].map(x=>`<button data-f="${x}" class="${x===f?'on':''}">${x}</button>`).join('')}</div>`+
-  (r.filter(p=>f==='Semua'||p.status===f).map(p=>`<div class="card"><div class="row"><b>${esc(p.nama)}</b><span class="tag ${p.jenis==='Sakit'?'S':'I'}" style="flex:0">${p.jenis.toUpperCase()}</span><span class="tag ${p.status}" style="flex:0">${p.status}</span></div><small>${p.tanggal} · ${SHN[p.kode_shift]}</small><p>${esc(p.keterangan)||'<span class="mut">Tanpa keterangan</span>'}</p>${p.foto_bukti?`<button class="sec" onclick="bukti(this,'${p.foto_bukti}')">Lihat bukti foto</button>`:''}`+
+  (r.filter(p=>f==='Semua'||p.status===f).map(p=>`<div class="card"><div class="row"><b>${esc(p.nama)}</b><span class="tag ${p.jenis==='Sakit'?'S':'I'}" style="flex:0">${p.jenis.toUpperCase()}</span><span class="tag ${p.status}" style="flex:0">${p.status}</span></div><small>${p.tanggal} · ${SHN[p.kode_shift]}</small><p>${esc(p.keterangan)||'<span class="mut">Tanpa keterangan</span>'}</p>${p.catatan_admin?`<p class="tgp"><b>Alasan penolakan:</b> ${esc(p.catatan_admin)}</p>`:''}${p.foto_bukti?`<button class="sec" onclick="bukti(this,'${p.foto_bukti}')">Lihat bukti foto</button>`:''}`+
   (p.status==='Menunggu'?`<div class="row" style="margin-top:10px"><button class="bad" onclick="proses('${p.id}',0)">Tolak (Alpa A)</button><button class="ok" onclick="proses('${p.id}',1)">Setujui (${p.jenis==='Sakit'?'S':'I'})</button></div>`:`<small>Diproses oleh ${esc(p.diproses_oleh)}</small>`)+'</div>').join('')||'<div class="card mut">Tidak ada pengajuan.</div>');
   document.querySelectorAll('.tabs button').forEach(x=>x.onclick=()=>{S.pf=x.dataset.f;A.pengajuan();});},
 async lap(){const t=S.lt||'',r=await api('listLaporan',{tanggal:t}),n=l=>(l.foto?String(l.foto).split(',').filter(Boolean):[]),rv=l=>l.catatan_admin?1:0,fk=S.lk||'',fj=S.lj||'',so=S.ls||'',jn=Array.from(new Set(r.map(l=>l.jenis))).sort();
@@ -410,7 +455,8 @@ async function simpanCatatan(id,btn){const ta=$('#c_'+id),v=ta.value.trim();if(b
 async function bukti(b,id){const d=await api('getFoto',{id});b.outerHTML='<img class="bukti" src="'+d+'" alt="Bukti foto">';}
 function unduh(b64,n){const a=document.createElement('a');a.href='data:application/pdf;base64,'+b64;a.download=n;document.body.appendChild(a);a.click();a.remove();}
 function logoPng(f){return new Promise(r=>{const im=new Image();im.onload=()=>{const k=Math.min(1,256/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);r(c.toDataURL('image/png'));};im.src=URL.createObjectURL(f);});}
-async function proses(id,s){await api('prosesPengajuan',{id,setuju:s});toast('Diproses');go(S.tab);}
+function pilihBukti(){return new Promise(res=>{const i=document.createElement('input');i.type='file';i.accept='image/*';i.onchange=async()=>res(i.files[0]?await kecil(i.files[0]):null);i.click();});}
+async function proses(id,s){let al='';if(!s){const r=prompt('Alasan penolakan (boleh dikosongkan, akan dilihat petugas):');if(r===null)return;al=r.trim();}await api('prosesPengajuan',{id,setuju:s,alasan:al});toast('Diproses');go(S.tab);}
 // ================= PWA =================
 if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));
 let dp;const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
